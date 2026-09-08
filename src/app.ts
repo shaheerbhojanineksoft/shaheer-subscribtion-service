@@ -13,6 +13,7 @@ import { createCheckoutController } from './modules/checkout/checkout.controller
 import { EmailService } from './modules/email/email.service';
 import { createEmailProviderFromEnv } from './modules/email/providers';
 import { EntitlementService } from './modules/subscriptions/entitlement.service';
+import { createCancelSubscriptionController } from './modules/subscriptions/cancel.controller';
 import { createEntitlementController } from './modules/subscriptions/entitlement.controller';
 import { createMongoSubscriptionRepository } from './modules/subscriptions/subscription.repository';
 import { SubscriptionService } from './modules/subscriptions/subscription.service';
@@ -78,6 +79,7 @@ export function createApp(db: Db): Hono {
 
   app.route('/subscriptions/checkout', createCheckoutController(checkoutService));
   app.route('/subscriptions', createEntitlementController(entitlementService));
+  app.route('/subscriptions/cancel', createCancelSubscriptionController(subscriptionService));
   app.route('/webhooks/stripe', createStripeWebhookController(webhookService));
 
   // API documentation (OpenAPI spec + Swagger UI).

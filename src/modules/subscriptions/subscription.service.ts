@@ -81,6 +81,15 @@ function snapshotToUpdate(snapshot: SubscriptionSnapshot): SubscriptionUpdate {
   };
 }
 
+export class SubscriptionNotFoundError extends Error {}
+
+export interface CancelSubscriptionResult {
+  canceled: boolean;
+  /** 'canceled' = cancelled now · 'already_inactive' = nothing to cancel. */
+  reason: 'canceled' | 'already_inactive';
+  subscription: Subscription;
+}
+
 export class SubscriptionService {
   private readonly repo: SubscriptionRepository;
   private readonly stripe: Stripe;
@@ -248,6 +257,61 @@ export class SubscriptionService {
       }),
     );
     return result;
+  }
+
+  /**
+   * Cancel a subscription on behalf of a customer.
+   *
+   * 1. Locates the MongoDB record by stripeSubscriptionId and verifies it
+   *    belongs to the given email.
+   * 2. Asks Stripe for the authoritative state — if the subscription is no
+   *    longer active/trialing there (e.g. already canceled or expired), there
+   *    is nothing to cancel; we just sync the local document to Stripe's
+   *    status.
+   * 3. Otherwise cancels it on Stripe immediately and marks the MongoDB
+   *    document canceled (Stripe's own customer.subscription.deleted event
+   *    confirms shortly after).
+   */
+  async cancelSubscription(input: {
+    email: string;
+    stripeSubscriptionId: string;
+  }): Promise<CancelSubscriptionResult> {
+    const email = normalizeEmail(input.email);
+    const doc = await this.repo.findByStripeSubscriptionId(input.stripeSubscriptionId);
+    if (!doc || doc.email !== email) {
+      throw new SubscriptionNotFoundError(
+        'No subscription found for this email and subscription id.',
+      );
+    }
+
+    // Source of truth: only cancel if Stripe still considers it active.
+    const stripeSub = await this.stripe.subscriptions.retrieve(input.stripeSubscriptionId);
+    const cancellable = stripeSub.status === 'active' || stripeSub.status === 'trialing';
+    if (!cancellable) {
+      const refreshed = await this.repo.updateSubscriptionByStripeId(input.stripeSubscriptionId, {
+        status: stripeSub.status as SubscriptionStatus,
+      });
+      this.logger.info(
+        `Cancel requested for ${input.stripeSubscriptionId} but it is already ` +
+          `"${stripeSub.status}" on Stripe; local doc synced.`,
+      );
+      return { canceled: false, reason: 'already_inactive', subscription: refreshed ?? doc };
+    }
+
+    // Cancel on Stripe first — the Mongo document is updated ONLY after Stripe
+    // confirms the cancellation succeeded (await below resolves successfully).
+    const canceled = await this.stripe.subscriptions.cancel(input.stripeSubscriptionId);
+
+    // Mirror Stripe's authoritative status into MongoDB.
+    const updated = await this.repo.updateSubscriptionByStripeId(input.stripeSubscriptionId, {
+      status: canceled.status as SubscriptionStatus,
+      cancelAtPeriodEnd: false,
+    });
+    this.logger.info(
+      `Subscription ${input.stripeSubscriptionId} cancelled on Stripe for ${email} ` +
+        `(stripeStatus=${canceled.status}).`,
+    );
+    return { canceled: true, reason: 'canceled', subscription: updated ?? doc };
   }
 
   /**

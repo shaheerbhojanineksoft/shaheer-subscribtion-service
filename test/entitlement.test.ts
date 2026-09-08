@@ -119,10 +119,13 @@ describe('EntitlementService — strict newest-subscription rule', () => {
     const result = await harness.entitlement.getEffectiveEntitlement('user@example.com');
     expect(result.active).toBe(false);
     expect(result.reason).toBe('newest_inactive');
+    expect(result.message).toContain('No active plan');
     // Even though the older Basic subscription is still active, the customer
     // must NOT fall back to it.
     expect(result.config).toBeNull();
-    expect(result.subscription?.status).toBe('canceled');
+    // No subscription data is exposed when there is no active plan.
+    expect(result.plan).toBeNull();
+    expect(result.subscription).toBeNull();
   });
 
   test('newest subscription past its current period → not valid', async () => {

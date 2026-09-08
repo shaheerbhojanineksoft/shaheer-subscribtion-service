@@ -21,6 +21,8 @@ export interface EntitlementResult {
   email: string;
   active: boolean;
   reason: EntitlementReason;
+  /** Human-readable summary shown to clients (e.g. "no active plan"). */
+  message: string;
   plan: PlanKey | null;
   productId: string | null;
   config: PlanConfig | null;
@@ -65,6 +67,7 @@ export class EntitlementService {
         email,
         active: false,
         reason: 'no_subscriptions',
+        message: 'No active plan for this user — no subscriptions found.',
         plan: null,
         productId: null,
         config: null,
@@ -81,18 +84,43 @@ export class EntitlementService {
       subscription: newest,
     };
 
+    const inactive = (reason: EntitlementReason, message: string) => ({
+      email,
+      active: false,
+      reason,
+      message,
+      // No subscription data is exposed when the user has no active plan.
+      plan: null,
+      productId: null,
+      config: null,
+      subscriptionId: null,
+      subscription: null,
+    });
+
     // The newest subscription is inactive → NO ACTIVE AUTHORITY. Older
     // subscriptions (even if still active) are deliberately not consulted.
     if (!isSubscriptionCurrentlyValid(newest)) {
-      return { ...base, active: false, reason: 'newest_inactive', config: null };
+      return inactive(
+        'newest_inactive',
+        'No active plan for this user — the newest subscription is not active.',
+      );
     }
 
     const config = getPlanConfig(newest.plan);
     if (!config) {
       // The newest subscription is valid but maps to an unknown plan.
-      return { ...base, active: false, reason: 'unknown_plan', config: null };
+      return inactive(
+        'unknown_plan',
+        'No active plan for this user — the newest subscription maps to an unknown plan.',
+      );
     }
 
-    return { ...base, active: true, reason: 'active', config };
+    return {
+      ...base,
+      active: true,
+      reason: 'active',
+      message: `Active plan: ${newest.plan}.`,
+      config,
+    };
   }
 }

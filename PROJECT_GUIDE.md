@@ -85,6 +85,7 @@ src/
 | `GET /health` | `src/app.ts` | Simple "am I alive" check |
 | `POST /subscriptions/checkout` | `checkout.controller.ts` → `checkout.service.ts` | Starts a Stripe Checkout for a plan |
 | `GET /subscriptions/entitlement?email=...` | `entitlement.controller.ts` → `entitlement.service.ts` | Returns the user's current permissions |
+| `POST /subscriptions/cancel` | `subscriptions/cancel.controller.ts` → `subscription.service.ts` | Cancel a subscription (Stripe + Mongo) — body `{ email, stripeSubscriptionId }` |
 | `POST /webhooks/stripe` | `stripe-webhook.controller.ts` → `stripe-webhook.service.ts` | Receives Stripe events (Stripe calls this) |
 | `GET /docs` | `swagger.ts` | Swagger UI — browse & try all APIs with descriptions |
 | `GET /openapi.json` | `swagger.ts` | Machine-readable OpenAPI 3 spec |

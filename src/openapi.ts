@@ -24,6 +24,7 @@ export const openapi = {
     { name: 'Health', description: 'Liveness checks' },
     { name: 'Checkout', description: 'Create Stripe Checkout sessions' },
     { name: 'Entitlement', description: 'Resolve a customer\'s current authority' },
+    { name: 'Subscriptions', description: 'Manage a customer\'s subscriptions' },
   ],
   paths: {
     '/health': {
@@ -125,6 +126,51 @@ export const openapi = {
         },
       },
     },
+
+    '/subscriptions/cancel': {
+      post: {
+        tags: ['Subscriptions'],
+        summary: 'Cancel a subscription',
+        description:
+          'Cancels a subscription on behalf of a customer.\n\n' +
+          '1. Locates the MongoDB record by `stripeSubscriptionId` and verifies it belongs to `email`.\n' +
+          '2. If Stripe still considers it active/trialing → cancels it on Stripe immediately and ' +
+          'marks the MongoDB document `canceled`.\n' +
+          '3. If it is already inactive on Stripe → returns `canceled: false` (local doc synced to Stripe).',
+        operationId: 'cancelSubscription',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/CancelSubscriptionRequest' },
+              example: { email: 'user@example.com', stripeSubscriptionId: 'sub_xxx' },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Cancelled, or already inactive (see `canceled`)',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/CancelSubscriptionResult' },
+              },
+            },
+          },
+          400: {
+            description: 'Invalid payload',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          404: {
+            description: 'No subscription found for this email + subscription id',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          500: {
+            description: 'Unexpected server error',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+        },
+      },
+    },
   },
 
   components: {
@@ -173,6 +219,7 @@ export const openapi = {
         properties: {
           email: { type: 'string', example: 'user@example.com' },
           active: { type: 'boolean', description: 'Whether the customer currently has authority.', example: true },
+          message: { type: 'string', description: 'Human-readable summary (e.g. "No active plan for this user…").' },
           reason: {
             type: 'string',
             enum: ['no_subscriptions', 'newest_inactive', 'unknown_plan', 'active'],
@@ -218,6 +265,32 @@ export const openapi = {
           cancelAtPeriodEnd: { type: 'boolean' },
           createdAt: { type: 'string', format: 'date-time' },
           updatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+
+      CancelSubscriptionRequest: {
+        type: 'object',
+        required: ['email', 'stripeSubscriptionId'],
+        properties: {
+          email: { type: 'string', format: 'email', example: 'user@example.com' },
+          stripeSubscriptionId: {
+            type: 'string',
+            description: 'Stripe subscription id to cancel.',
+            example: 'sub_xxx',
+          },
+        },
+      },
+
+      CancelSubscriptionResult: {
+        type: 'object',
+        properties: {
+          canceled: { type: 'boolean', example: true },
+          reason: {
+            type: 'string',
+            enum: ['canceled', 'already_inactive'],
+            description: 'canceled = cancelled just now · already_inactive = nothing to cancel.',
+          },
+          subscription: { $ref: '#/components/schemas/Subscription' },
         },
       },
 
