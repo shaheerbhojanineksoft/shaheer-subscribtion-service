@@ -128,3 +128,17 @@ export function isAllowedPrice(priceId: string): boolean {
 export function getAllowedPrice(priceId: string): AllowedPriceConfig | null {
   return ALLOWED_PRICES[priceId] ?? null;
 }
+
+/**
+ * Resolve the configured Stripe price for a plan + billing interval.
+ * The backend uses this so clients only ever send a plan enum name.
+ */
+export function getConfiguredPrice(
+  plan: PlanKey,
+  billingInterval: 'month' | 'year',
+): AllowedPriceConfig | null {
+  for (const price of Object.values(ALLOWED_PRICES)) {
+    if (price.plan === plan && price.billingInterval === billingInterval) return price;
+  }
+  return null;
+}

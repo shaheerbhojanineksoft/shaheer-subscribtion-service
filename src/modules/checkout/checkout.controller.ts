@@ -17,13 +17,24 @@ export function createCheckoutController(checkoutService: CheckoutService): Hono
       body = null;
     }
 
-    const { email, priceId } = (body ?? {}) as { email?: unknown; priceId?: unknown };
-    if (typeof email !== 'string' || typeof priceId !== 'string') {
-      return c.json({ error: 'Request body must include "email" and "priceId".' }, 400);
+    const { email, plan, billingInterval } = (body ?? {}) as {
+      email?: unknown;
+      plan?: unknown;
+      billingInterval?: unknown;
+    };
+    if (typeof email !== 'string' || typeof plan !== 'string') {
+      return c.json(
+        { error: 'Request body must include "email" and a valid "plan" (basic | pro | enterprise).' },
+        400,
+      );
     }
 
     try {
-      const result = await checkoutService.createCheckoutSession({ email, priceId });
+      const result = await checkoutService.createCheckoutSession({
+        email,
+        plan,
+        billingInterval: typeof billingInterval === 'string' ? billingInterval : undefined,
+      });
       return c.json(result, 201);
     } catch (error) {
       if (error instanceof CheckoutValidationError) {

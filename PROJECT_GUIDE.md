@@ -93,14 +93,17 @@ src/
 ```bash
 curl -X POST http://localhost:3000/subscriptions/checkout \
   -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","priceId":"price_1UDQylGuLSLkQ7qaRtHzfICm"}'
+  -d '{"email":"user@example.com","plan":"pro","billingInterval":"month"}'
 ```
 **What happens:**
 1. Checks the email is valid.
-2. Checks the `priceId` is in the allowed list (`src/config/plans.ts`).
-3. Asks Stripe to make a Checkout session (mode = subscription).
-4. Returns `{ url, id, email, priceId, productId, plan }`.
-5. Open the `url` in a browser → customer pays with Stripe.
+2. Checks the `plan` name is one of `basic` | `pro` | `enterprise` and the
+   interval is `month` | `year` (default `month`).
+3. The backend **resolves the Stripe price** from `src/config/plans.ts`
+   (the client never sends a Stripe price id).
+4. Asks Stripe to make a Checkout session (mode = subscription).
+5. Returns `{ url, id, email, plan, billingInterval, productId, priceId }`.
+6. Open the `url` in a browser → customer pays with Stripe.
 
 ### 4.2 Check a user's entitlement
 ```bash
@@ -152,7 +155,7 @@ sequenceDiagram
     participant S as Stripe
     participant M as MongoDB
 
-    U->>A: POST /subscriptions/checkout {email, priceId}
+    U->>A: POST /subscriptions/checkout {email, plan, billingInterval}
     A->>S: create Checkout Session (mode=subscription)
     S-->>A: session url
     A-->>U: { url }
@@ -286,7 +289,7 @@ bun test           # run tests (26 tests)
 - payment failure
 - cancellation (record preserved)
 - monthly vs annual prices → same plan
-- invalid Price IDs rejected
+- invalid plan names / intervals rejected
 - invalid webhook signature rejected
 
 ---
@@ -355,7 +358,7 @@ Two different situations:
    ```bash
    curl -X POST http://localhost:3000/subscriptions/checkout \
      -H "Content-Type: application/json" \
-     -d '{"email":"you@example.com","priceId":"price_1UDQylGuLSLkQ7qaRtHzfICm"}'
+     -d '{"email":"you@example.com","plan":"pro","billingInterval":"month"}'
    ```
 3. Open the returned `url` in a browser.
 4. Pay with the test card: **`4242 4242 4242 4242`**, any future expiry,

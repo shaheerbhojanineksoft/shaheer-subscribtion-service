@@ -50,10 +50,11 @@ export const openapi = {
         tags: ['Checkout'],
         summary: 'Create a Stripe Checkout session',
         description:
-          'Validates the email and the supplied Stripe Price ID against the configured allowed ' +
-          'prices, then creates a Stripe Checkout session (`mode=subscription`, quantity 1). ' +
-          'Returns the hosted Checkout URL to redirect the customer to.\n\n' +
-          'Arbitrary/unknown Price IDs are rejected (400).',
+          'Validates the email and the plan enum (`basic` | `pro` | `enterprise`), resolves the ' +
+          'configured Stripe price for the requested billing interval, then creates a Stripe ' +
+          'Checkout session (`mode=subscription`, quantity 1). Returns the hosted Checkout URL to ' +
+          'redirect the customer to.\n\n' +
+          'Clients send a plan NAME — never Stripe price ids. Unknown plans/intervals are rejected (400).',
         operationId: 'createCheckoutSession',
         requestBody: {
           required: true,
@@ -62,7 +63,8 @@ export const openapi = {
               schema: { $ref: '#/components/schemas/CheckoutRequest' },
               example: {
                 email: 'user@example.com',
-                priceId: 'price_1UDQylGuLSLkQ7qaRtHzfICm',
+                plan: 'pro',
+                billingInterval: 'month',
               },
             },
           },
@@ -129,7 +131,7 @@ export const openapi = {
     schemas: {
       CheckoutRequest: {
         type: 'object',
-        required: ['email', 'priceId'],
+        required: ['email', 'plan'],
         properties: {
           email: {
             type: 'string',
@@ -137,10 +139,18 @@ export const openapi = {
             description: 'Customer email. Used as the subscription\'s application-level reference (no userId at this stage).',
             example: 'user@example.com',
           },
-          priceId: {
+          plan: {
             type: 'string',
-            description: 'A Stripe Price ID that is configured as an allowed price (monthly or annual).',
-            example: 'price_1UDQylGuLSLkQ7qaRtHzfICm',
+            enum: ['basic', 'pro', 'enterprise'],
+            description: 'Plan name from the allowed enum. The backend resolves the Stripe Product/Price.',
+            example: 'pro',
+          },
+          billingInterval: {
+            type: 'string',
+            enum: ['month', 'year'],
+            default: 'month',
+            description: 'Billing interval (optional, defaults to \"month\").',
+            example: 'month',
           },
         },
       },
@@ -151,9 +161,10 @@ export const openapi = {
           id: { type: 'string', description: 'Stripe Checkout Session id.', example: 'cs_test_...' },
           url: { type: 'string', format: 'uri', description: 'Hosted Checkout URL — redirect the customer here.', example: 'https://checkout.stripe.com/c/pay/cs_test_...' },
           email: { type: 'string', example: 'user@example.com' },
-          priceId: { type: 'string', example: 'price_1UDQylGuLSLkQ7qaRtHzfICm' },
-          productId: { type: 'string', description: 'Stripe Product (plan) id.', example: 'prod_VDskx9YEWVcWlm' },
           plan: { type: 'string', enum: ['basic', 'pro', 'enterprise'], example: 'pro' },
+          billingInterval: { type: 'string', enum: ['month', 'year'], example: 'month' },
+          productId: { type: 'string', description: 'Stripe Product (plan) id — resolved by the backend.', example: 'prod_VDskx9YEWVcWlm' },
+          priceId: { type: 'string', description: 'Stripe Price id — resolved by the backend.', example: 'price_1UDQylGuLSLkQ7qaRtHzfICm' },
         },
       },
 
