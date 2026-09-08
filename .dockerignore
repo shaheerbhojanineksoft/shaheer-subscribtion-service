@@ -1,0 +1,24 @@
+# Secrets / environment — never bake into the image
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Tests & docs not needed at runtime
+test/
+*.test.ts
+
+# Git / editor / os
+.git
+.gitignore
+.vscode
+.DS_Store
+Thumbs.db
+
+# Logs / build
+*.log
+coverage/
+dist/
+build/

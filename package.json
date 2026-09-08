@@ -1,0 +1,25 @@
+{
+  "name": "traderverse-subscription-service",
+  "version": "1.0.0",
+  "description": "Bun-based Stripe subscription & entitlement service backed by MongoDB",
+  "type": "module",
+  "private": true,
+  "module": "src/index.ts",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "hono": "^4.7.0",
+    "mongodb": "^6.12.0",
+    "stripe": "^17.6.0",
+    "swagger-ui-dist": "^5.32.15"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}
