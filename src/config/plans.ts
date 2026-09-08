@@ -19,6 +19,15 @@
 export const PLAN_KEYS = ['basic', 'pro', 'enterprise'] as const;
 export type PlanKey = (typeof PLAN_KEYS)[number];
 
+/**
+ * Every entitlement tier — includes the built-in FREE plan. `free` is NOT
+ * linked to any Stripe product/price; it is only a config-level default for
+ * users with no paid subscription.
+ */
+export type EntitlementPlanKey = PlanKey | 'free';
+
+export const FREE_PLAN = 'free' as const;
+
 export interface PlanConfig {
   /** Whether the plan allows creating posts. */
   canCreatePost: boolean;
@@ -26,7 +35,12 @@ export interface PlanConfig {
   maxPosts: number;
 }
 
-export const PLAN_CONFIG: Record<PlanKey, PlanConfig> = {
+export const PLAN_CONFIG: Record<EntitlementPlanKey, PlanConfig> = {
+  // Built-in free tier — not linked to Stripe. Tune these values freely.
+  free: {
+    canCreatePost: false,
+    maxPosts: 0,
+  },
   basic: {
     canCreatePost: false,
     maxPosts: 0,
@@ -116,7 +130,7 @@ export function getPlanForProduct(productId: string): PlanKey | null {
   return PRODUCT_TO_PLAN[productId] ?? null;
 }
 
-export function getPlanConfig(plan: PlanKey | null | undefined): PlanConfig | null {
+export function getPlanConfig(plan: EntitlementPlanKey | null | undefined): PlanConfig | null {
   if (!plan) return null;
   return PLAN_CONFIG[plan] ?? null;
 }

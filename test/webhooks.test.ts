@@ -418,10 +418,13 @@ describe('Stripe webhooks', () => {
     const pro = await harness.repo.findByStripeSubscriptionId('sub_pro');
     expect(pro?.status).toBe('canceled');
 
-    // Newest is canceled → NO ACTIVE AUTHORITY, even though Basic is still active.
+    // Newest is canceled → default FREE plan, even though Basic is still active
+    // (the system never falls back to an older paid subscription).
     const entitlement = await harness.entitlement.getEffectiveEntitlement(EMAIL);
-    expect(entitlement.active).toBe(false);
-    expect(entitlement.reason).toBe('newest_inactive');
+    expect(entitlement.active).toBe(true);
+    expect(entitlement.reason).toBe('free');
+    expect(entitlement.plan).toBe('free');
+    expect(entitlement.isFreePlan).toBe(true);
   });
 
   test('customer.subscription.updated reflects a price/plan change on the existing document', async () => {

@@ -193,6 +193,9 @@ Important:
 - **One active subscription per user:** when a new plan is purchased and its
   payment succeeds, the user's older *active* subscriptions are **automatically
   unsubscribed on Stripe** (history documents are preserved).
+- **Default FREE plan:** if the user has no valid paid subscription, the API
+  returns the built-in **`free`** plan (`reason: "free"`, `isFreePlan: true`).
+  It is config-only — **not linked to Stripe** (`productId: null`).
 
 ---
 

@@ -44,12 +44,17 @@ function seed(
 }
 
 describe('EntitlementService — strict newest-subscription rule', () => {
-  test('no subscriptions → no active authority', async () => {
+  test('no paid subscription → default free plan (not Stripe-linked)', async () => {
     const harness: Harness = createHarness();
     const result = await harness.entitlement.getEffectiveEntitlement('nobody@example.com');
-    expect(result.active).toBe(false);
-    expect(result.reason).toBe('no_subscriptions');
-    expect(result.config).toBeNull();
+    expect(result.active).toBe(true);
+    expect(result.reason).toBe('free');
+    expect(result.plan).toBe('free');
+    expect(result.isFreePlan).toBe(true);
+    expect(result.productId).toBeNull();
+    expect(result.subscriptionId).toBeNull();
+    expect(result.subscription).toBeNull();
+    expect(result.config).toEqual({ canCreatePost: false, maxPosts: 0 });
   });
 
   test('single active Basic subscription → Basic authority', async () => {
@@ -99,7 +104,7 @@ describe('EntitlementService — strict newest-subscription rule', () => {
     expect(all).toHaveLength(3);
   });
 
-  test('newest inactive + older active → NO ACTIVE AUTHORITY (no fallback)', async () => {
+  test('newest inactive + older active → default free plan (NO fallback to older paid)', async () => {
     const harness: Harness = createHarness();
     await seed(harness.repo, 'user@example.com', 'sub_basic', {
       productId: 'prod_basic',
@@ -117,15 +122,17 @@ describe('EntitlementService — strict newest-subscription rule', () => {
     await harness.repo.updateSubscriptionByStripeId('sub_pro', { status: 'canceled' });
 
     const result = await harness.entitlement.getEffectiveEntitlement('user@example.com');
-    expect(result.active).toBe(false);
-    expect(result.reason).toBe('newest_inactive');
-    expect(result.message).toContain('No active plan');
+    expect(result.active).toBe(true);
+    expect(result.reason).toBe('free');
+    expect(result.plan).toBe('free');
+    expect(result.isFreePlan).toBe(true);
+    expect(result.message).toContain('free plan');
     // Even though the older Basic subscription is still active, the customer
-    // must NOT fall back to it.
-    expect(result.config).toBeNull();
-    // No subscription data is exposed when there is no active plan.
-    expect(result.plan).toBeNull();
+    // must NOT fall back to it — only the default free plan applies.
+    expect(result.plan).not.toBe('basic');
+    expect(result.subscriptionId).toBeNull();
     expect(result.subscription).toBeNull();
+    expect(result.config).toEqual({ canCreatePost: false, maxPosts: 0 });
   });
 
   test('newest subscription past its current period → not valid', async () => {
@@ -148,11 +155,13 @@ describe('EntitlementService — strict newest-subscription rule', () => {
     });
 
     const result = await harness.entitlement.getEffectiveEntitlement('user@example.com');
-    expect(result.active).toBe(false);
-    expect(result.reason).toBe('newest_inactive');
+    expect(result.active).toBe(true);
+    expect(result.reason).toBe('free');
+    expect(result.plan).toBe('free');
+    expect(result.isFreePlan).toBe(true);
   });
 
-  test('newest subscription maps to an unknown plan → no authority', async () => {
+  test('newest subscription maps to an unknown plan → default free plan', async () => {
     const harness: Harness = createHarness();
     const subscription = makeSubscription({
       id: 'sub_unknown',
@@ -180,8 +189,10 @@ describe('EntitlementService — strict newest-subscription rule', () => {
     });
 
     const result = await harness.entitlement.getEffectiveEntitlement('user@example.com');
-    expect(result.active).toBe(false);
-    expect(result.reason).toBe('unknown_plan');
+    expect(result.active).toBe(true);
+    expect(result.reason).toBe('free');
+    expect(result.plan).toBe('free');
+    expect(result.isFreePlan).toBe(true);
   });
 
   test('trialing subscription is currently valid (Stripe status trusted)', async () => {
