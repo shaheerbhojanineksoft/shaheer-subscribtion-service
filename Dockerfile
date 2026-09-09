@@ -11,6 +11,11 @@ RUN bun install --production
 # Copy application source.
 COPY . .
 
-EXPOSE 3000
+# The service reads its port from the PORT env var at runtime (see src/index.ts).
+# EXPOSE is informational only; pass --build-arg PORT=xxxx to document another
+# port, and set PORT in the environment (docker-compose env_file: .env) to
+# actually listen on it.
+ARG PORT=3000
+EXPOSE ${PORT}
 
 CMD ["bun", "run", "src/index.ts"]
