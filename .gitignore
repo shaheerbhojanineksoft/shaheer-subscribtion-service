@@ -7,6 +7,9 @@ node_modules/
 .env.local
 .env.*.local
 
+# Local infra config (private)
+docker-compose.yml
+
 # Build output
 dist/
 build/
