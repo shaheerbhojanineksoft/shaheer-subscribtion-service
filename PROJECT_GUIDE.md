@@ -256,7 +256,7 @@ Notes:
 | File | What it controls |
 | --- | --- |
 | `.env` | Secrets & settings (Stripe keys, Mongo, URLs, email). **Gitignored — never commit.** |
-| `.env.example` | Template showing which variables exist (safe to commit). |
+| `.env.example` | Local-only template — NOT tracked/pushed. Create config from `.env` directly. |
 | `src/config/plans.ts` | ⭐ Which product = which plan, which price IDs are allowed, permission values. |
 
 ---
