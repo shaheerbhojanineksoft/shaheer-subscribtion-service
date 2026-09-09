@@ -25,6 +25,9 @@ export interface Env {
   /** Set true to bypass the auth guard (local dev without Keycloak). */
   AUTH_DISABLED: boolean;
 
+  /** Shared secret that must be sent as the `x-api-key` header on open APIs (e.g. checkout). */
+  API_KEY?: string;
+
   EMAIL_PROVIDER?: string;
   EMAIL_FROM?: string;
   SENDGRID_API_KEY?: string;
@@ -58,6 +61,8 @@ export function loadEnv(source: Record<string, string | undefined>): Env {
     KEYCLOAK_REALM: source.KEYCLOAK_REALM || undefined,
     KEYCLOAK_CLIENT_ID: source.KEYCLOAK_CLIENT_ID || undefined,
     AUTH_DISABLED: ['true', '1'].includes((source.AUTH_DISABLED ?? '').toLowerCase()),
+
+    API_KEY: source.API_KEY || undefined,
 
     EMAIL_PROVIDER: source.EMAIL_PROVIDER || undefined,
     EMAIL_FROM: source.EMAIL_FROM || undefined,

@@ -8,6 +8,7 @@ import { Hono } from 'hono';
 import type { Db } from 'mongodb';
 import { env } from './config/env';
 import { getStripeClient } from './config/stripe';
+import { apiKeyGuard } from './modules/auth/api-key';
 import { authGuard, createJwtVerifier, type JwtVerifier } from './modules/auth/keycloak';
 import { CheckoutService } from './modules/checkout/checkout.service';
 import { createCheckoutController } from './modules/checkout/checkout.controller';
@@ -99,6 +100,17 @@ export function createApp(db: Db): Hono {
   });
 
   app.get('/health', (c) => c.json({ status: 'ok' }));
+
+  // Open business APIs that are NOT behind Keycloak still need the shared
+  // x-api-key (except /health, which stays public for liveness checks).
+  if (env.API_KEY) {
+    app.use('/subscriptions/checkout', apiKeyGuard(env.API_KEY));
+    logger.info('API key protection ENABLED for POST /subscriptions/checkout (x-api-key).');
+  } else {
+    logger.warn(
+      'API_KEY not set — POST /subscriptions/checkout will REJECT requests (fail closed).',
+    );
+  }
 
   app.route('/subscriptions/checkout', createCheckoutController(checkoutService));
   // Protected routes — Keycloak token required (when enabled).

@@ -83,17 +83,19 @@ src/
 | Method & path | File that handles it | What it does |
 | --- | --- | --- |
 | `GET /health` | `src/app.ts` | Simple "am I alive" check |
-| `POST /subscriptions/checkout` | `checkout.controller.ts` → `checkout.service.ts` | Starts a Stripe Checkout for a plan |
+| `POST /subscriptions/checkout` 🔑 | `checkout.controller.ts` → `checkout.service.ts` | Starts a Stripe Checkout for a plan — requires `x-api-key` header |
 | `GET /subscriptions/entitlement` 🔒 | `entitlement.controller.ts` → `entitlement.service.ts` | Returns the caller's current permissions — email taken from the Keycloak token (client never sends it) |
 | `POST /subscriptions/cancel/:stripeSubscriptionId` 🔒 | `subscriptions/cancel.controller.ts` → `subscription.service.ts` | Cancel a subscription — subscription id in the URL path, email taken from the Keycloak token |
 | `POST /webhooks/stripe` | `stripe-webhook.controller.ts` → `stripe-webhook.service.ts` | Receives Stripe events (Stripe calls this) |
 | `GET /docs` | `swagger.ts` | Swagger UI — browse & try all APIs with descriptions |
 | `GET /openapi.json` | `swagger.ts` | Machine-readable OpenAPI 3 spec |
 
-### 4.1 Create a Checkout session
+### 4.1 Create a Checkout session (API-key protected)
 ```bash
+# The x-api-key header value is API_KEY from .env
 curl -X POST http://localhost:3000/subscriptions/checkout \
   -H "Content-Type: application/json" \
+  -H "x-api-key: tv-checkout-dev-4f8c9a3b2e7d1f6a" \
   -d '{"email":"user@example.com","plan":"pro","billingInterval":"month"}'
 ```
 **What happens:**

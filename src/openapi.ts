@@ -55,8 +55,10 @@ export const openapi = {
           'configured Stripe price for the requested billing interval, then creates a Stripe ' +
           'Checkout session (`mode=subscription`, quantity 1). Returns the hosted Checkout URL to ' +
           'redirect the customer to.\n\n' +
-          'Clients send a plan NAME — never Stripe price ids. Unknown plans/intervals are rejected (400).',
+          'Clients send a plan NAME — never Stripe price ids. Unknown plans/intervals are rejected (400).\n\n' +
+          'Requires the shared `x-api-key` header (the value of `API_KEY`).',
         operationId: 'createCheckoutSession',
+        security: [{ apiKeyAuth: [] }],
         requestBody: {
           required: true,
           content: {
@@ -81,6 +83,10 @@ export const openapi = {
           },
           400: {
             description: 'Validation failed (invalid email or disallowed Price ID)',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          401: {
+            description: 'Missing/invalid x-api-key header',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
           },
           500: {
@@ -180,6 +186,12 @@ export const openapi = {
         scheme: 'bearer',
         bearerFormat: 'JWT',
         description: 'Keycloak-issued access token (Authorization: Bearer <token>).',
+      },
+      apiKeyAuth: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'x-api-key',
+        description: 'Shared API key (the value of API_KEY in the server .env).',
       },
     },
     schemas: {
