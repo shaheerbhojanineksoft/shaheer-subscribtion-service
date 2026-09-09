@@ -6,7 +6,6 @@
  */
 
 export interface Env {
-  NODE_ENV: string;
   PORT: number;
 
   STRIPE_SECRET_KEY?: string;
@@ -45,7 +44,6 @@ function toNumber(value: string | undefined, fallback: number): number {
 
 export function loadEnv(source: Record<string, string | undefined>): Env {
   return {
-    NODE_ENV: source.NODE_ENV ?? 'development',
     PORT: toNumber(source.PORT, 3000),
 
     STRIPE_SECRET_KEY: source.STRIPE_SECRET_KEY || undefined,
