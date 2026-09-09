@@ -84,8 +84,8 @@ src/
 | --- | --- | --- |
 | `GET /health` | `src/app.ts` | Simple "am I alive" check |
 | `POST /subscriptions/checkout` | `checkout.controller.ts` → `checkout.service.ts` | Starts a Stripe Checkout for a plan |
-| `GET /subscriptions/entitlement?email=...` | `entitlement.controller.ts` → `entitlement.service.ts` | Returns the user's current permissions |
-| `POST /subscriptions/cancel` | `subscriptions/cancel.controller.ts` → `subscription.service.ts` | Cancel a subscription (Stripe + Mongo) — body `{ email, stripeSubscriptionId }` |
+| `GET /subscriptions/entitlement` 🔒 | `entitlement.controller.ts` → `entitlement.service.ts` | Returns the caller's current permissions — email taken from the Keycloak token (client never sends it) |
+| `POST /subscriptions/cancel/:stripeSubscriptionId` 🔒 | `subscriptions/cancel.controller.ts` → `subscription.service.ts` | Cancel a subscription — subscription id in the URL path, email taken from the Keycloak token |
 | `POST /webhooks/stripe` | `stripe-webhook.controller.ts` → `stripe-webhook.service.ts` | Receives Stripe events (Stripe calls this) |
 | `GET /docs` | `swagger.ts` | Swagger UI — browse & try all APIs with descriptions |
 | `GET /openapi.json` | `swagger.ts` | Machine-readable OpenAPI 3 spec |
@@ -106,11 +106,13 @@ curl -X POST http://localhost:3000/subscriptions/checkout \
 5. Returns `{ url, id, email, plan, billingInterval, productId, priceId }`.
 6. Open the `url` in a browser → customer pays with Stripe.
 
-### 4.2 Check a user's entitlement
+### 4.2 Check a user's entitlement (PROTECTED)
 ```bash
-curl "http://localhost:3000/subscriptions/entitlement?email=user@example.com"
+# The Keycloak token decides WHO you are — no email is sent in the request.
+curl "http://localhost:3000/subscriptions/entitlement" \
+  -H "Authorization: Bearer <KEYCLOAK_TOKEN>"
 ```
-Returns something like:
+Returns something like (email comes from the token):
 ```json
 {
   "email": "user@example.com",

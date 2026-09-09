@@ -1,13 +1,13 @@
 /**
- * HTTP controller to cancel a subscription.
- * Mounted at: POST /subscriptions/cancel
+ * HTTP controller to cancel a subscription (PROTECTED route).
+ * Mounted at: POST /subscriptions/cancel/:stripeSubscriptionId
  *
- * Body: { "email": "...", "stripeSubscriptionId": "sub_..." }
- * Behaviour: verifies the record belongs to the email, cancels it on Stripe
- * (if still active there) and marks the MongoDB document canceled.
+ * The stripe subscription id is a URL path parameter (no request body).
+ * The email is taken from the authenticated Keycloak token (not the body),
+ * so a caller can only cancel subscriptions that belong to themselves.
  */
 import { Hono } from 'hono';
-import { isValidEmail, normalizeEmail } from '../../utils/email';
+import { getAuthenticatedUser } from '../auth/keycloak';
 import { logger } from '../../utils/logger';
 import {
   SubscriptionNotFoundError,
@@ -17,34 +17,27 @@ import {
 export function createCancelSubscriptionController(subscriptionService: SubscriptionService): Hono {
   const app = new Hono();
 
-  app.post('/', async (c) => {
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      body = null;
-    }
-
-    const { email, stripeSubscriptionId } = (body ?? {}) as {
-      email?: unknown;
-      stripeSubscriptionId?: unknown;
-    };
-    if (
-      typeof email !== 'string' ||
-      typeof stripeSubscriptionId !== 'string' ||
-      !isValidEmail(email)
-    ) {
+  app.post('/:stripeSubscriptionId', async (c) => {
+    const stripeSubscriptionId = c.req.param('stripeSubscriptionId');
+    if (!stripeSubscriptionId) {
       return c.json(
-        { error: 'Request body must include a valid "email" and "stripeSubscriptionId".' },
+        { error: 'URL path must include "stripeSubscriptionId".' },
         400,
       );
     }
 
+    // Email comes from the verified Keycloak token, not from the client.
+    const user = getAuthenticatedUser(c);
+    const email = user?.email ?? user?.preferred_username ?? null;
+    if (!email) {
+      return c.json(
+        { error: 'Unauthorized — the token does not carry an email claim.' },
+        401,
+      );
+    }
+
     try {
-      const result = await subscriptionService.cancelSubscription({
-        email: normalizeEmail(email),
-        stripeSubscriptionId,
-      });
+      const result = await subscriptionService.cancelSubscription({ email, stripeSubscriptionId });
       return c.json(result, 200);
     } catch (error) {
       if (error instanceof SubscriptionNotFoundError) {

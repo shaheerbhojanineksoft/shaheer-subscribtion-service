@@ -8,6 +8,7 @@ import { Hono } from 'hono';
 import type { Db } from 'mongodb';
 import { env } from './config/env';
 import { getStripeClient } from './config/stripe';
+import { authGuard, createJwtVerifier, type JwtVerifier } from './modules/auth/keycloak';
 import { CheckoutService } from './modules/checkout/checkout.service';
 import { createCheckoutController } from './modules/checkout/checkout.controller';
 import { EmailService } from './modules/email/email.service';
@@ -60,6 +61,28 @@ export function createApp(db: Db): Hono {
 
   const entitlementService = new EntitlementService(repo);
 
+  // Keycloak auth — protects GET /subscriptions/entitlement with a Bearer JWT.
+  const keycloakEnabled =
+    !env.AUTH_DISABLED && Boolean(env.KEYCLOAK_URL && env.KEYCLOAK_REALM);
+  const verifier: JwtVerifier | null = keycloakEnabled
+    ? createJwtVerifier({
+        url: env.KEYCLOAK_URL as string,
+        realm: env.KEYCLOAK_REALM as string,
+        clientId: env.KEYCLOAK_CLIENT_ID,
+      })
+    : null;
+  if (keycloakEnabled) {
+    logger.info(
+      `Keycloak auth ENABLED for /subscriptions/entitlement (realm=${env.KEYCLOAK_REALM}).`,
+    );
+  } else if (env.AUTH_DISABLED) {
+    logger.warn('Auth DISABLED (AUTH_DISABLED=true) — entitlement endpoint is OPEN.');
+  } else {
+    logger.warn(
+      'Keycloak not configured (KEYCLOAK_URL / KEYCLOAK_REALM) — entitlement auth is OFF.',
+    );
+  }
+
   const app = new Hono();
 
   // Log every incoming request and its outcome — the visible "flow trail".
@@ -78,6 +101,10 @@ export function createApp(db: Db): Hono {
   app.get('/health', (c) => c.json({ status: 'ok' }));
 
   app.route('/subscriptions/checkout', createCheckoutController(checkoutService));
+  // Protected routes — Keycloak token required (when enabled).
+  app.use('/subscriptions/entitlement', authGuard(verifier));
+  // Cancel takes the subscription id in the URL: /subscriptions/cancel/:stripeSubscriptionId
+  app.use('/subscriptions/cancel/*', authGuard(verifier));
   app.route('/subscriptions', createEntitlementController(entitlementService));
   app.route('/subscriptions/cancel', createCancelSubscriptionController(subscriptionService));
   app.route('/webhooks/stripe', createStripeWebhookController(webhookService));

@@ -1,11 +1,13 @@
 /**
- * HTTP controller for entitlement lookups.
- * Mounted at: GET /subscriptions/entitlement?email=user@example.com
+ * HTTP controller for entitlement lookups (PROTECTED route).
+ * Mounted at: GET /subscriptions/entitlement
  *
- * Intended for other services/middleware to resolve a customer's current
- * authority using the strict newest-subscription rule.
+ * The email comes from the authenticated Keycloak token (like the cancel
+ * route), so a user can only look up their own entitlement — the client never
+ * sends an email.
  */
 import { Hono } from 'hono';
+import { getAuthenticatedUser } from '../auth/keycloak';
 import { isValidEmail, normalizeEmail } from '../../utils/email';
 import type { EntitlementService } from './entitlement.service';
 
@@ -13,12 +15,17 @@ export function createEntitlementController(entitlementService: EntitlementServi
   const app = new Hono();
 
   app.get('/entitlement', async (c) => {
-    const rawEmail = c.req.query('email');
-    if (!rawEmail || !isValidEmail(rawEmail)) {
-      return c.json({ error: 'A valid "email" query parameter is required.' }, 400);
+    // Email comes from the verified Keycloak token, not from the client.
+    const user = getAuthenticatedUser(c);
+    const email = user?.email ?? user?.preferred_username ?? null;
+    if (!email || !isValidEmail(email)) {
+      return c.json(
+        { error: 'Unauthorized — the token does not carry a valid email claim.' },
+        401,
+      );
     }
 
-    const result = await entitlementService.getEffectiveEntitlement(normalizeEmail(rawEmail));
+    const result = await entitlementService.getEffectiveEntitlement(normalizeEmail(email));
     return c.json(result, 200);
   });
 

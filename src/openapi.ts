@@ -94,22 +94,15 @@ export const openapi = {
     '/subscriptions/entitlement': {
       get: {
         tags: ['Entitlement'],
-        summary: 'Resolve effective entitlement for an email',
+        summary: 'Resolve effective entitlement for the authenticated user',
         description:
-          'Returns the customer\'s current authority using the **strict newest-subscription rule**:\n' +
+          'Returns the caller\'s current authority using the **strict newest-subscription rule**.\n' +
+          'The email is taken from the authenticated Keycloak token — the client never sends it.\n' +
           '- Only the newest subscription is considered.\n' +
-          '- If the newest is inactive/expired → `active: false` (never falls back to an older one).\n' +
+          '- If the newest is inactive/expired → falls back to the default `free` plan (never to an older paid one).\n' +
           '- If active → returns the plan config with its permissions.',
         operationId: 'getEntitlement',
-        parameters: [
-          {
-            name: 'email',
-            in: 'query',
-            required: true,
-            description: 'Customer email (application-level user reference).',
-            schema: { type: 'string', format: 'email', example: 'user@example.com' },
-          },
-        ],
+        security: [{ bearerAuth: [] }],
         responses: {
           200: {
             description: 'Effective entitlement resolved',
@@ -119,34 +112,37 @@ export const openapi = {
               },
             },
           },
-          400: {
-            description: 'Missing/invalid email query parameter',
+          401: {
+            description: 'Missing/invalid Bearer token or token has no email claim',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
           },
         },
       },
     },
 
-    '/subscriptions/cancel': {
+    '/subscriptions/cancel/{stripeSubscriptionId}': {
       post: {
         tags: ['Subscriptions'],
         summary: 'Cancel a subscription',
         description:
           'Cancels a subscription on behalf of a customer.\n\n' +
-          '1. Locates the MongoDB record by `stripeSubscriptionId` and verifies it belongs to `email`.\n' +
+          '1. Locates the MongoDB record by the `stripeSubscriptionId` path parameter and verifies it ' +
+          'belongs to the email carried by the authenticated Keycloak token.\n' +
           '2. If Stripe still considers it active/trialing → cancels it on Stripe immediately and ' +
           'marks the MongoDB document `canceled`.\n' +
           '3. If it is already inactive on Stripe → returns `canceled: false` (local doc synced to Stripe).',
         operationId: 'cancelSubscription',
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: { $ref: '#/components/schemas/CancelSubscriptionRequest' },
-              example: { email: 'user@example.com', stripeSubscriptionId: 'sub_xxx' },
-            },
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'stripeSubscriptionId',
+            in: 'path',
+            required: true,
+            description: "Stripe subscription id to cancel (must belong to the authenticated user's email).",
+            example: 'sub_xxx',
+            schema: { type: 'string' },
           },
-        },
+        ],
         responses: {
           200: {
             description: 'Cancelled, or already inactive (see `canceled`)',
@@ -157,7 +153,11 @@ export const openapi = {
             },
           },
           400: {
-            description: 'Invalid payload',
+            description: 'Missing/invalid `stripeSubscriptionId` path parameter',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          401: {
+            description: 'Missing/invalid Bearer token or token has no email claim',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
           },
           404: {
@@ -174,6 +174,14 @@ export const openapi = {
   },
 
   components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Keycloak-issued access token (Authorization: Bearer <token>).',
+      },
+    },
     schemas: {
       CheckoutRequest: {
         type: 'object',
@@ -282,19 +290,6 @@ export const openapi = {
           cancelAtPeriodEnd: { type: 'boolean' },
           createdAt: { type: 'string', format: 'date-time' },
           updatedAt: { type: 'string', format: 'date-time' },
-        },
-      },
-
-      CancelSubscriptionRequest: {
-        type: 'object',
-        required: ['email', 'stripeSubscriptionId'],
-        properties: {
-          email: { type: 'string', format: 'email', example: 'user@example.com' },
-          stripeSubscriptionId: {
-            type: 'string',
-            description: 'Stripe subscription id to cancel.',
-            example: 'sub_xxx',
-          },
         },
       },
 

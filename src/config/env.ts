@@ -18,6 +18,13 @@ export interface Env {
   APP_SUCCESS_URL?: string;
   APP_CANCEL_URL?: string;
 
+  // Keycloak auth (protects entitlement/management endpoints).
+  KEYCLOAK_URL?: string;
+  KEYCLOAK_REALM?: string;
+  KEYCLOAK_CLIENT_ID?: string;
+  /** Set true to bypass the auth guard (local dev without Keycloak). */
+  AUTH_DISABLED: boolean;
+
   EMAIL_PROVIDER?: string;
   EMAIL_FROM?: string;
   SENDGRID_API_KEY?: string;
@@ -46,6 +53,11 @@ export function loadEnv(source: Record<string, string | undefined>): Env {
 
     APP_SUCCESS_URL: source.APP_SUCCESS_URL || undefined,
     APP_CANCEL_URL: source.APP_CANCEL_URL || undefined,
+
+    KEYCLOAK_URL: source.KEYCLOAK_URL || undefined,
+    KEYCLOAK_REALM: source.KEYCLOAK_REALM || undefined,
+    KEYCLOAK_CLIENT_ID: source.KEYCLOAK_CLIENT_ID || undefined,
+    AUTH_DISABLED: ['true', '1'].includes((source.AUTH_DISABLED ?? '').toLowerCase()),
 
     EMAIL_PROVIDER: source.EMAIL_PROVIDER || undefined,
     EMAIL_FROM: source.EMAIL_FROM || undefined,
